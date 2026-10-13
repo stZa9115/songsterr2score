@@ -1,0 +1,14 @@
+[project]
+name = "songsterr2score"
+version = "0.1.0"
+description = "Songsterr 另存的 HTML -> 五線譜 / TAB (PDF, MusicXML)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["svgpathtools"]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

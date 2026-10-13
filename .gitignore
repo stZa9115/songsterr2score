@@ -1,0 +1,11 @@
+# Songsterr 另存頁面與其衍生輸出皆含有版權譜面內容，一律不進版控
+samples/
+output/
+*.html
+!songsterr2score/static/*.html
+
+.venv/
+__pycache__/
+.pytest_cache/
+.claude/settings.local.json
+.claude/skills/

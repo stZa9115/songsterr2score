@@ -1,0 +1,10 @@
+#!/bin/sh
+# main only changes through merged PRs. Enable with: git config core.hooksPath .githooks
+[ -n "$ALLOW_MAIN_PUSH" ] && exit 0
+while read -r _local _lsha remote _rsha; do
+  if [ "$remote" = "refs/heads/main" ]; then
+    echo "pre-push: 不可直接 push 到 main，請開分支並發 PR。" >&2
+    exit 1
+  fi
+done
+exit 0
