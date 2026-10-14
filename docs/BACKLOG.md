@@ -14,9 +14,10 @@
 - `convert()` 可接受譜名，輸出檔名為 `{譜名}_staff/_tab/_both`，PDF 內標題為該譜名；回傳輸出檔路徑與警告清單。
 - CLI 新增 `--name`；未指定時使用預設譜名。
 - 偵測不完整的頁面：Songsterr 只渲染畫面附近的譜行，其餘留下 `data-player-key="tab" data-line-unit-index="N"` 佔位元素。
-  應有行數 = 佔位元素數；實際行數 = `multitrack-line-group-N` 的數量。兩者不同時產生警告：
-  「頁面只包含 X/Y 行譜，請用 tools/collect-songsterr.js 收集完整譜面」，並列出缺少的小節範圍（若可推得）。
-  `tools/collect-songsterr.js` 產生的檔案不會有佔位元素，視為完整。
+  應有行數 = 佔位元素數；實際行數 = 不重複的 `multitrack-line-group-N` 數量。兩者不同時產生警告：
+  「頁面只包含 X/Y 行譜，請用 tools/collect-songsterr.js 收集完整譜面」。
+  `tools/collect-songsterr.js` 產生的檔案兩者相等（`samples/` 四份皆是），不可產生此警告；
+  `samples/_orig/bass-propose.html` 是 Ctrl+S 存的不完整頁面（10/24 行），可用來測試會產生警告。
 - 現有 golden 測試不需更新即通過（.ly 內的 title 若因此改變，屬預期變動，於 PR 說明後更新 golden）。
 
 ## 2. [ ] FastAPI 後端
@@ -41,16 +42,18 @@
 
 ## 4. [ ] 六弦與和弦
 
-樣本（`samples/`）：
-- `OUTSIDER RODEO …Distortion Guitar 1…`：標準調弦，單音速彈與和弦混合。
-- `なつのうた …`：Drop D（最低弦 MIDI 38），以和弦為主。
-- `Fear Of The Dark Bass Tab …`：四弦 bass，比 bass-propose 難（有無法辨識的符號、重疊音），可當額外回歸樣本。
+樣本（`samples/`，皆以收集腳本取得的完整譜面）：
+- `OUTSIDER RODEO Tab by RAISE A SUILEN - Distortion Guitar 1`：163 小節，標準調弦，單音速彈與和弦混合。
+- `なつのうた Tab by 打首獄門同好会`：110 小節，Drop D（最低弦 MIDI 38），以和弦為主。
+- `Fear Of The Dark Bass Tab by Iron Maiden`：253 小節，四弦 bass，目前 767 個警告，可當較難的 bass 回歸樣本。
+- `【MV】プロポーズ Bass Tab by 9Lana`：162 小節，零警告，已有 golden。
 
 已知問題（先修這個，否則吉他的節奏全錯）：
 - `parse_html` 寫死四弦的座標：符桿 `M x,50v18`、符槓 y=61/66。六弦的符桿在 y=74、符槓在 y=85/90，
   也就是整體下移 `12*(弦數-4)`。目前吉他樣本一條符桿都抓不到，每個音都被當成「無符桿」去估計時值。
-- 無法辨識的字形：`9x10`（吉他兩份都有）、`3x13`（なつのうた、Fear Of The Dark）。先查出是什麼符號再決定支援或明確略過。
-- 吉他頁面另有 `M x,83v9` 路徑（4 處），用途未明。
+- 無法辨識的字形（寬x高）：`3x13`（Fear Of The Dark 482 次、なつのうた 26 次）、`9x10`（三份共 11 次）、
+  `11x22`（3 次）。先查出是什麼符號再決定支援或明確略過；Fear Of The Dark 的 3x13 可能是它 162 個拍數不符的主因。
+- 吉他頁面另有 `M x,83v9` 路徑，用途未明。
 
 驗收：
 - 兩份吉他樣本皆可轉換，三種 .ly 都能通過 LilyPond 編譯，且不再出現「無符桿音符」與「時值無法表示」警告（真正無符桿的全音符除外）。
