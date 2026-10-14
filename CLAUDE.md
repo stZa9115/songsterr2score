@@ -10,7 +10,7 @@
 
 ```
 uv sync                                   # 安裝依賴
-uv run pytest -q                          # 全部測試（約 3 秒）
+uv run pytest -q                          # 全部測試（約 30 秒，多數時間在 LilyPond 編譯）
 uv run python -m songsterr2score 譜.html  # CLI 轉換
 git config core.hooksPath .githooks       # clone 後執行一次，啟用禁止直推 main 的 hook
 ```
@@ -22,17 +22,21 @@ PDF 需要系統已安裝 LilyPond 2.24+；找不到時只輸出 .ly 與 .musicx
 - `songsterr2score/core.py` — 全部轉換邏輯：解析 HTML 內的 SVG 譜面 → 節奏推算 → 產生 LilyPond / MusicXML。
 - `tests/test_core.py` — 純函式單元測試，不需要樣本。
 - `tests/test_golden.py` — 對 `samples/*.html` 做 golden 比對，並確認 LilyPond 編譯成功。
+- `tools/collect-songsterr.js` — 使用者在 Songsterr 譜頁 F12 Console 執行，逐行捲動收集完整譜面並下載成一個 .html。
+  Ctrl+S 或複製 DOM 都只拿得到畫面附近約 10 行。
 - `samples/` — **gitignore**。真實 Songsterr 頁面與 `samples/golden/` 基準輸出，只存在本機。
 
 ## 規則
 
 - **版權**：Songsterr 頁面及其衍生物（.ly / .musicxml / PDF、golden）不可提交、不可貼進 PR 或 issue。新增測試樣本一律放 `samples/`。
-- **Golden**：`samples/golden/` 是防止退步的基準，bass 樣本的基準「大致正確、未逐小節核對」。
-  只有待辦項目明確要改變輸出時才能用 `UPDATE_GOLDEN=1 uv run pytest` 重新產生，
+- **Golden**：`samples/golden/` 是防止退步的基準。目前只有プロポーズ有基準：第 1–73 小節使用者看過「大致正確」，
+  第 74–162 小節未經人工核對（但零警告）。
+  還沒有 golden 的樣本會被跳過（輸出尚未可信）。
+  只有待辦項目明確要改變輸出時才能用 `UPDATE_GOLDEN=<樣本名稱片段> uv run pytest` 重新產生單一樣本（`=1` 為全部），
   而且要先看 diff 確認每個差異都是預期的，並在 PR 說明改了什麼、為什麼。不可為了讓測試變綠而更新 golden。
 - **語言**：UI 文字、警告訊息、README、docs 用繁體中文；識別字、commit 訊息、PR 標題用英文。
 - **依賴**：能用標準庫或既有依賴就不要加新的。不要預先做抽象層。
-- 六弦 / 和弦相關的工作必須有 `samples/` 裡的吉他樣本才能做；沒有樣本就跳過該項並回報。
+- 在 Windows 終端機印出日文 / 中文時要設 `PYTHONIOENCODING=utf-8`，否則會因 cp950 編碼錯誤中斷。
 
 ## Loop 工作流程
 
