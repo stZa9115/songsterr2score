@@ -13,6 +13,10 @@
 - 新增檔名清理函式，依 SPEC 規則；有單元測試。
 - `convert()` 可接受譜名，輸出檔名為 `{譜名}_staff/_tab/_both`，PDF 內標題為該譜名；回傳輸出檔路徑與警告清單。
 - CLI 新增 `--name`；未指定時使用預設譜名。
+- 偵測不完整的頁面：Songsterr 只渲染畫面附近的譜行，其餘留下 `data-player-key="tab" data-line-unit-index="N"` 佔位元素。
+  應有行數 = 佔位元素數；實際行數 = `multitrack-line-group-N` 的數量。兩者不同時產生警告：
+  「頁面只包含 X/Y 行譜，請用 tools/collect-songsterr.js 收集完整譜面」，並列出缺少的小節範圍（若可推得）。
+  `tools/collect-songsterr.js` 產生的檔案不會有佔位元素，視為完整。
 - 現有 golden 測試不需更新即通過（.ly 內的 title 若因此改變，屬預期變動，於 PR 說明後更新 golden）。
 
 ## 2. [ ] FastAPI 後端

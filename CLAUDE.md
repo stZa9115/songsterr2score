@@ -22,6 +22,8 @@ PDF 需要系統已安裝 LilyPond 2.24+；找不到時只輸出 .ly 與 .musicx
 - `songsterr2score/core.py` — 全部轉換邏輯：解析 HTML 內的 SVG 譜面 → 節奏推算 → 產生 LilyPond / MusicXML。
 - `tests/test_core.py` — 純函式單元測試，不需要樣本。
 - `tests/test_golden.py` — 對 `samples/*.html` 做 golden 比對，並確認 LilyPond 編譯成功。
+- `tools/collect-songsterr.js` — 使用者在 Songsterr 譜頁 F12 Console 執行，逐行捲動收集完整譜面並下載成一個 .html。
+  Ctrl+S 或複製 DOM 都只拿得到畫面附近約 10 行。
 - `samples/` — **gitignore**。真實 Songsterr 頁面與 `samples/golden/` 基準輸出，只存在本機。
 
 ## 規則

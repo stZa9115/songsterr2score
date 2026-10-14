@@ -9,6 +9,12 @@
 - [uv](https://docs.astral.sh/uv/)
 - [LilyPond](https://lilypond.org) 2.24 以上（產生 PDF 用；沒有時只輸出 .ly 與 .musicxml）
 
+## 取得譜頁
+
+Songsterr 只會渲染畫面附近的譜行，直接 Ctrl+S 存到的譜不完整。請在譜頁按 F12 → Console，
+貼上 [tools/collect-songsterr.js](tools/collect-songsterr.js) 的全部內容後按 Enter，
+等它捲完整首後會自動下載一個 .html。
+
 ## 使用
 
 ```
