@@ -41,3 +41,15 @@ def test_line_counts():
 def test_parse_html_not_songsterr():
     with pytest.raises(core.SongsterrError):
         core.parse_html('<html><title>hi</title></html>', print)
+
+
+def test_main_errors(tmp_path, monkeypatch, capsys):
+    bad = tmp_path/'bad.html'
+    bad.write_text('<html></html>', encoding='utf-8')
+    monkeypatch.setattr(core, 'find_lilypond', lambda _: None)
+    monkeypatch.setattr('sys.argv', ['x', str(bad)])
+    with pytest.raises(SystemExit) as e: core.main()
+    assert e.value.code == 1 and '[錯誤]' in capsys.readouterr().out
+    monkeypatch.setattr('sys.argv', ['x', str(bad), str(bad), '--name', 'A'])
+    with pytest.raises(SystemExit) as e: core.main()
+    assert e.value.code != 0

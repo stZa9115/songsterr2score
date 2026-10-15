@@ -82,3 +82,16 @@ def test_convert_uses_name(tmp_path):
     assert 'title = "My: Song"' in (tmp_path/'My_ Song_both.ly').read_text(encoding='utf-8')
     with pytest.raises(core.SongsterrError):
         core.convert(f, tmp_path, None, None, name=' . ')
+
+
+def test_cli_name_and_default(tmp_path, monkeypatch):
+    f = ROOT/'samples'/'【MV】プロポーズ Bass Tab by 9Lana.html'
+    if not f.exists(): pytest.skip('沒有樣本')
+    monkeypatch.setattr(core, 'find_lilypond', lambda _: None)
+    monkeypatch.setattr('sys.argv', ['x', str(f), '-o', str(tmp_path/'a'), '--bars', '1-4', '--name', 'Q"x'])
+    core.main()
+    assert (tmp_path/'a'/'Q_x_tab.ly').exists()
+    monkeypatch.setattr('sys.argv', ['x', str(f), '-o', str(tmp_path/'b'), '--bars', '1-4'])
+    core.main()
+    ly = tmp_path/'b'/'【MV】プロポーズ - 9Lana_both.ly'
+    assert 'title = "【MV】プロポーズ - 9Lana"' in ly.read_text(encoding='utf-8')
