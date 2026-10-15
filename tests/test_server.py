@@ -55,7 +55,7 @@ def test_files(tmp_output):
     assert client.get('/files/a.pdf').content == b'pdf'
     for bad in ('missing.pdf', '..', '..%2Fsecret.txt', '..%5Csecret.txt', '%2E%2E%2Fsecret.txt'):
         assert client.get('/files/'+bad).status_code == 404, bad
-    for bad in ('../secret.txt', '..\secret.txt', str(tmp_output.parent/'secret.txt')):
+    for bad in ('../secret.txt', r'..\secret.txt',str(tmp_output.parent/'secret.txt')):
         with pytest.raises(HTTPException): server.files(bad)
 
 
