@@ -111,3 +111,12 @@ def test_overfull_measure_keeps_barlines():
     ly = core.build_ly(song, 1, 2, 'tab')
     assert ly.index('make-moment 24/16') < ly.index('% 1') < ly.index('make-moment 16/16') < ly.index('% 2')
     assert '<backup><duration>24</duration></backup>' in core.build_xml(song, 1, 2)
+
+
+def test_musicxml_string_numbers():
+    # MusicXML：弦 1 = 最高音弦；LilyPond \1 也是最高音弦
+    chord = dict(kind='note', u=16, notes=[dict(string=5, fret=0, midi=40), dict(string=0, fret=3, midi=67)])
+    song = dict(sigs=[], meas={1: [chord]}, allm=[1], ns=6, tuning=[64, 59, 55, 50, 45, 40], title='t', tempo=120)
+    xml = core.build_xml(song, 1, 1)
+    assert '<string>6</string><fret>0</fret>' in xml and '<string>1</string><fret>3</fret>' in xml
+    assert core.ly_measure(song, 1) == r"<e,\6 g'\1>1"

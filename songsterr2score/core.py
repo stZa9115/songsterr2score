@@ -341,7 +341,7 @@ def build_xml(song, first, last):
                     x += ('<notehead>x</notehead>' if n and n['fret'] is None else '') + '<staff>%d</staff>' % staff
                     if n:
                         x += '<notations>%s<technical><string>%d</string><fret>%d</fret></technical></notations>' % (
-                            ''.join('<tied type="%s"/>' % t for t in ties), ns-n['string'], n['fret'] or 0)
+                            ''.join('<tied type="%s"/>' % t for t in ties), n['string']+1, n['fret'] or 0)   # MusicXML 弦 1 = 最高音弦
                     o.append(x+'</note>')
             if staff == 1: o.append('<backup><duration>%d</duration></backup>' % round(length(song['meas'][mn])*k))
         o.append('</measure>')
