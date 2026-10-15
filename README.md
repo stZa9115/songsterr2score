@@ -56,7 +56,7 @@ Windows 也可以直接雙擊 `start.bat`。瀏覽器會自動開啟 http://127.
 ### 命令列
 
 ```
-uv run python -m songsterr2score 譜.html [更多.html 或資料夾 ...] [-o 輸出資料夾] [--bars 1-16] [--name 譜名]
+uv run python -m songsterr2score 譜.html [更多.html 或資料夾 ...] [-o 輸出資料夾] [--bars 1-16] [--name 譜名] [--lilypond lilypond 執行檔路徑]
 ```
 
 Windows 也可以把 .html 拖到 `convert.bat` 上。
@@ -73,7 +73,7 @@ Windows 也可以把 .html 拖到 `convert.bat` 上。
 
 ## 已知限制
 
-- 推弦、滑音、悶音、連結線等技巧記號目前不會輸出。
+- 推弦、滑音、搥勾弦、顫音等技巧記號目前不會輸出。
 - 只轉換另存當下畫面上的那一個音軌。
 - 節奏是從譜面圖形推算的，遇到無法辨識的符號或拍數不符的小節會顯示警告，請對照原譜確認。
 - PDF 標題若含日文或中文，可能因 LilyPond 找不到合適字型而無法顯示。
