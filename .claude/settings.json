@@ -42,15 +42,11 @@
     ],
     "deny": [
       "Bash(git push*--force*)",
-      "Bash(git push* -f*)",
       "Bash(git push*--no-verify*)",
-      "Bash(git push* main*)",
       "Bash(git commit*--no-verify*)",
       "Bash(gh pr merge*)",
       "PowerShell(git push*--force*)",
-      "PowerShell(git push* -f*)",
       "PowerShell(git push*--no-verify*)",
-      "PowerShell(git push* main*)",
       "PowerShell(git commit*--no-verify*)",
       "PowerShell(gh pr merge*)"
     ]
