@@ -20,7 +20,7 @@
   `samples/_orig/bass-propose.html` 是 Ctrl+S 存的不完整頁面（10/24 行），可用來測試會產生警告。
 - 現有 golden 測試不需更新即通過（.ly 內的 title 若因此改變，屬預期變動，於 PR 說明後更新 golden）。
 
-## 2. [ ] FastAPI 後端
+## 2. [x] FastAPI 後端
 
 驗收：
 - `POST /api/inspect`：上傳 .html，回傳 JSON（標題、預設譜名、弦數、調弦、小節範圍、警告）。
