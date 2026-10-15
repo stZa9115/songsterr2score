@@ -7,20 +7,19 @@ songsterr2score.py  --  Songsterr 網頁 (另存的 .html) -> 五線譜/四線�
        <name>_staff.ly/.pdf     (只有五線譜)
        <name>_tab.ly/.pdf       (只有 TAB)
        PDF 需要安裝 LilyPond (https://lilypond.org)；找不到就只輸出 .ly 與 .musicxml
-用法 : uv run python -m songsterr2score 譜.html [更多.html 或資料夾 ...] [-o 輸出資料夾] [--bars 1-16]
+用法 : uv run python -m songsterr2score 譜.html [更多.html 或資料夾 ...] [-o 輸出資料夾] [--bars 1-16] [--name 譜名]
 需求 : Python 3.10+ 與 uv sync
 """
-import re, sys, json, shutil, argparse, subprocess, pathlib
-from collections import defaultdict
-try:
-    from svgpathtools import parse_path
-except ImportError:
-    sys.exit("缺少套件，請先執行:  pip install svgpathtools")
+import re, sys, json, html as htmllib, shutil, argparse, subprocess, pathlib
+from svgpathtools import parse_path
 
 NAMES = ['c','cis','d','dis','e','f','fis','g','gis','a','ais','b']
 XSTEP = [('C',0),('C',1),('D',0),('D',1),('E',0),('F',0),('F',1),('G',0),('G',1),('A',0),('A',1),('B',0)]
 DUR_LY = {1:'16',2:'8',3:'8.',4:'4',6:'4.',8:'2',12:'2.',16:'1'}
 DUR_XML = {1:('16th',0),2:('eighth',0),3:('eighth',1),4:('quarter',0),6:('quarter',1),8:('half',0),12:('half',1),16:('whole',0)}
+
+class SongsterrError(Exception):
+    """無法轉換：不是 Songsterr 譜頁、找不到譜面、譜名為空等。訊息為繁中。"""
 
 # ---------------------------------------------------------------- 讀 HTML
 def split_lines(html):
@@ -28,19 +27,37 @@ def split_lines(html):
     st.append(len(html))
     return [re.sub(r'<defs>.*?</defs>', '', html[st[i]:st[i+1]], flags=re.S) for i in range(len(st)-1)]
 
+def read_json(html, key):
+    """頁面內嵌 JSON 中第一個 "key": 之後的值；讀不到時回傳 None"""
+    i = html.find('"%s":' % key)
+    if i < 0: return None
+    try: return json.JSONDecoder().raw_decode(html, i+len(key)+3)[0]
+    except ValueError: return None
+
 def read_tracks(html):
-    i = html.find('"tracks":[')
-    if i < 0: return []
-    j = i + len('"tracks":'); depth = 0
-    for k in range(j, len(html)):
-        c = html[k]
-        if c == '[': depth += 1
-        elif c == ']':
-            depth -= 1
-            if depth == 0:
-                try: return json.loads(html[j:k+1])
-                except Exception: return []
-    return []
+    t = read_json(html, 'tracks')
+    return t if isinstance(t, list) else []
+
+def page_title(html):
+    m = re.search(r'<title>(.*?)</title>', html, re.S)
+    return htmllib.unescape(m.group(1)).split('|')[0].strip() if m else ''
+
+def default_name(html):
+    """預設譜名「曲名 - 藝人」，取自 meta.current；讀不到時退回 <title> 中 | 之前的文字"""
+    meta = read_json(html, 'meta')
+    cur = meta.get('current') if isinstance(meta, dict) else None
+    if isinstance(cur, dict) and cur.get('title') and cur.get('artist'):
+        return '%s - %s' % (cur['title'].strip(), cur['artist'].strip())
+    return page_title(html)
+
+def safe_filename(name):
+    """Windows 不允許的字元換成 _，去除首尾空白與句點"""
+    return re.sub(r'^[\s.]+|[\s.]+$', '', re.sub(r'[\\/:*?"<>|]', '_', name))
+
+def line_counts(html):
+    """(實際譜行數, 應有譜行數)；未渲染的譜行只留下佔位元素"""
+    have = len(set(re.findall(r'data-testid="multitrack-line-group-(\d+)"', html)))
+    return have, len(re.findall(r'data-player-key="tab" data-line-unit-index="\d+"', html))
 
 def glyphs_of(d):
     out = []
@@ -81,10 +98,11 @@ def parse_html(html, warn):
     part = int(m.group(1)) if m else None
     tr = next((t for t in tracks if t.get('partId') == part), None)
     tuning = (tr or {}).get('tuning')
-    title = re.search(r'<title>(.*?)</title>', html, re.S)
-    title = title.group(1).split('|')[0].strip() if title else 'Songsterr'
+    title = page_title(html) or 'Songsterr'
     lines = split_lines(html)
-    if not lines: sys.exit("找不到譜面 (multitrack-line-group)；請確認是在譜頁完整載入後另存。")
+    if not lines: raise SongsterrError("找不到譜面 (multitrack-line-group)；請確認是 Songsterr 譜頁並在完整載入後另存。")
+    have, want = line_counts(html)
+    if want and have != want: warn('頁面只包含 %d/%d 行譜，請用 tools/collect-songsterr.js 收集完整譜面' % (have, want))
     if not tuning:
         n = len(re.findall(r'class="-0AoUa_tuning"', lines[0]))
         tuning = [43,38,33,28] if n == 4 else [64,59,55,50,45,40]
@@ -274,28 +292,34 @@ def find_lilypond(user):
         if p.exists(): cands += [str(x) for x in p.glob('**/lilypond.exe')]
     return next((c for c in cands if c and pathlib.Path(c).exists()), None)
 
-def convert(path, outdir, bars, lily):
-    path = pathlib.Path(path)
+def convert(path, outdir, bars, lily, name=None):
+    """轉換一個 html；name 為譜名 (預設 default_name)。回傳 (輸出檔路徑, 警告)"""
+    path, outdir = pathlib.Path(path), pathlib.Path(outdir)
     warns = []
     warn = lambda s: (warns.append(s), print('  [注意]', s))
     print('讀取', path.name)
-    song = finalize(parse_html(path.read_text(encoding='utf-8', errors='replace'), warn), warn)
+    html = path.read_text(encoding='utf-8', errors='replace')
+    song = finalize(parse_html(html, warn), warn)
+    song['title'] = (name if name is not None else default_name(html)).strip()
+    stem = safe_filename(song['title'])
+    if not stem: raise SongsterrError('譜名不可為空')
     allm = song['allm']
     first, last = (bars if bars else (min(allm), max(allm)))
     first, last = max(first, min(allm)), min(last, max(allm))
-    stem = re.sub(r'[\\/:*?"<>|]', '_', path.stem)[:60]
     outdir.mkdir(parents=True, exist_ok=True)
-    base = outdir/stem
-    (outdir/(stem+'.musicxml')).write_text(build_xml(song, first, last), encoding='utf-8')
+    files = [outdir/(stem+'.musicxml')]
+    files[0].write_text(build_xml(song, first, last), encoding='utf-8')
     for mode in ('both', 'staff', 'tab'):
         f = outdir/('%s_%s.ly' % (stem, mode))
         f.write_text(build_ly(song, first, last, mode), encoding='utf-8')
+        files.append(f)
         if lily:
             r = subprocess.run([lily, '-s', '-o', str(outdir/('%s_%s' % (stem, mode))), str(f)], capture_output=True, encoding='utf-8', errors='replace')
             if r.returncode: warn('LilyPond 轉 %s 失敗: %s' % (mode, r.stderr.strip()[-200:]))
+            else: files.append(f.with_suffix('.pdf'))
     print('  %d 弦 調弦 MIDI %s | 小節 %d-%d | 輸出 -> %s' % (song['ns'], song['tuning'], first, last, outdir))
     if not lily: print('  (找不到 LilyPond，只輸出 .musicxml 與 .ly；安裝 LilyPond 後重跑即可得到 PDF)')
-    return warns
+    return files, warns
 
 def main():
     ap = argparse.ArgumentParser(description='Songsterr 另存 HTML -> 五線譜/TAB')
@@ -303,16 +327,22 @@ def main():
     ap.add_argument('-o', '--out', help='輸出資料夾 (預設: 與 html 同資料夾下的 output)')
     ap.add_argument('--bars', help='只轉換小節範圍，例如 1-16')
     ap.add_argument('--lilypond', help='lilypond 執行檔路徑 (預設自動尋找)')
+    ap.add_argument('--name', help='譜名，作為 PDF 標題與輸出檔名 (預設「曲名 - 藝人」)；只能用於單一檔案')
     a = ap.parse_args()
     bars = tuple(int(x) for x in a.bars.split('-')) if a.bars else None
     files = []
     for i in a.inputs:
         p = pathlib.Path(i)
         files += sorted(p.glob('*.html')) if p.is_dir() else [p]
+    if a.name is not None and len(files) != 1: ap.error('--name 只能用於單一檔案')
     lily = find_lilypond(a.lilypond)
+    failed = 0
     for f in files:
         out = pathlib.Path(a.out) if a.out else f.parent/'output'
-        convert(f, out, bars, lily)
+        try: convert(f, out, bars, lily, a.name)
+        except (SongsterrError, OSError) as e:
+            print('  [錯誤]', f.name, e); failed += 1
+    if failed: sys.exit(1)
 
 if __name__ == '__main__':
     main()

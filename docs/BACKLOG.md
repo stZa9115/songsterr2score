@@ -2,7 +2,7 @@
 
 依序進行。每項的「驗收」全部滿足且 `uv run pytest -q` 全綠才算完成。規格見 [SPEC.md](SPEC.md)。
 
-## 1. [ ] core 可被程式呼叫
+## 1. [x] core 可被程式呼叫
 
 現在的 `core.py` 只適合 CLI：找不到譜面時 `sys.exit`，檔名取自 HTML 檔名。
 

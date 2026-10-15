@@ -19,7 +19,7 @@ Songsterr 只會渲染畫面附近的譜行，直接 Ctrl+S 存到的譜不完�
 
 ```
 uv sync
-uv run python -m songsterr2score 譜.html
+uv run python -m songsterr2score 譜.html            # 預設譜名「曲名 - 藝人」，可用 --name 指定
 ```
 
 輸出在 html 所在資料夾下的 `output/`。Windows 也可以把 .html 拖到 `convert.bat` 上。
