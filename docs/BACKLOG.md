@@ -40,7 +40,7 @@
 - 測試：`GET /` 回 200 且包含上傳欄位、譜名欄位、轉換按鈕。
 - 新增一個啟動指令（啟動伺服器並開啟瀏覽器），並更新 `convert.bat` 或新增對應的 .bat。
 
-## 4. [ ] 六弦與和弦
+## 4. [x] 六弦與和弦
 
 樣本（`samples/`，皆以收集腳本取得的完整譜面）：
 - `OUTSIDER RODEO Tab by RAISE A SUILEN - Distortion Guitar 1`：163 小節，標準調弦，單音速彈與和弦混合。

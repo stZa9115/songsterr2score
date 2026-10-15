@@ -29,8 +29,8 @@ PDF 需要系統已安裝 LilyPond 2.24+；找不到時只輸出 .ly 與 .musicx
 ## 規則
 
 - **版權**：Songsterr 頁面及其衍生物（.ly / .musicxml / PDF、golden）不可提交、不可貼進 PR 或 issue。新增測試樣本一律放 `samples/`。
-- **Golden**：`samples/golden/` 是防止退步的基準。目前只有プロポーズ有基準：第 1–73 小節使用者看過「大致正確」，
-  第 74–162 小節未經人工核對（但零警告）。
+- **Golden**：`samples/golden/` 是防止退步的基準。プロポーズ：第 1–73 小節使用者看過「大致正確」，
+  第 74–162 小節未經人工核對（但零警告）。OUTSIDER RODEO、なつのうた：BACKLOG 第 4 項產生，尚待使用者對照原譜。
   還沒有 golden 的樣本會被跳過（輸出尚未可信）。
   只有待辦項目明確要改變輸出時才能用 `UPDATE_GOLDEN=<樣本名稱片段> uv run pytest` 重新產生單一樣本（`=1` 為全部），
   而且要先看 diff 確認每個差異都是預期的，並在 PR 說明改了什麼、為什麼。不可為了讓測試變綠而更新 golden。
