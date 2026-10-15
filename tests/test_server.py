@@ -63,10 +63,10 @@ def test_run_listens_localhost(monkeypatch):
     import uvicorn
     seen = {}
     monkeypatch.setattr(uvicorn, 'run', lambda app, **kw: seen.update(kw))
-    monkeypatch.setattr(server.threading, 'Timer', lambda t, f, a: seen.update(opened=(f, a)) or type('T', (), {'start': lambda self: None})())
+    monkeypatch.setattr(server.threading, 'Timer', lambda t, f, a: seen.update(opened=(f, a)) or type('T', (), {'start': lambda self: seen.update(started=True)})())
     server.run()
     assert seen['host'] == '127.0.0.1'
-    assert seen['opened'] == (server.webbrowser.open, ['http://127.0.0.1:8000/'])
+    assert seen['opened'] == (server.webbrowser.open, ['http://127.0.0.1:8000/']) and seen['started']
 
 
 def test_index_page():
