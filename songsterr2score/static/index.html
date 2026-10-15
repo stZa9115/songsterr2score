@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Songsterr 轉五線譜</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+  #drop { border: 2px dashed #888; border-radius: 8px; padding: 1.5rem; text-align: center; }
+  #drop.over { background: #eef; }
+  label { display: block; font-weight: bold; margin-top: 1rem; }
+  input[type=text] { width: 100%; padding: .4rem; font-size: 1rem; box-sizing: border-box; }
+  button { margin-top: 1rem; padding: .5rem 1.5rem; font-size: 1rem; }
+  :focus-visible { outline: 3px solid #36f; outline-offset: 2px; }
+  #error { color: #b00; font-weight: bold; }
+  .warn { color: #a60; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: .2rem 1rem; }
+  dt { font-weight: bold; }
+  dd { margin: 0; }
+</style>
+</head>
+<body>
+<h1>Songsterr 轉五線譜 / TAB</h1>
+
+<div id="drop">
+  <label for="file">1. 選擇或拖放 Songsterr 譜頁 (.html)</label>
+  <input type="file" id="file" accept=".html">
+</div>
+
+<p id="status" role="status" aria-live="polite"></p>
+<p id="error" role="alert"></p>
+
+<form id="form" hidden>
+  <dl id="info"></dl>
+  <ul id="inspect-warnings" class="warn"></ul>
+  <label for="name">2. 譜名（PDF 標題與檔名）</label>
+  <input type="text" id="name" required>
+  <button type="submit" id="convert">3. 轉換</button>
+</form>
+
+<section id="result" hidden>
+  <h2>完成</h2>
+  <ul id="pdfs"></ul>
+  <ul id="convert-warnings" class="warn"></ul>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+let file = null;
+
+function list(el, items) {
+  el.replaceChildren(...items.map(t => { const li = document.createElement('li'); li.textContent = t; return li; }));
+}
+
+async function api(url, data) {
+  const r = await fetch(url, { method: 'POST', body: data });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : '伺服器錯誤 (' + r.status + ')');
+  return j;
+}
+
+async function inspect(f) {
+  file = f;
+  $('error').textContent = '';
+  $('form').hidden = $('result').hidden = true;
+  $('status').textContent = '解析中…';
+  const data = new FormData();
+  data.append('file', f);
+  try {
+    const j = await api('/api/inspect', data);
+    const info = [['頁面標題', j.title], ['弦數', j.strings], ['調弦 (MIDI)', j.tuning.join(', ')], ['小節', j.bars.join('–')]];
+    $('info').replaceChildren(...info.flatMap(([k, v]) => {
+      const dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = k; dd.textContent = v; return [dt, dd];
+    }));
+    list($('inspect-warnings'), j.warnings);
+    $('name').value = j.default_name;
+    $('form').hidden = false;
+    $('status').textContent = '';
+    $('name').focus();
+  } catch (e) {
+    $('status').textContent = '';
+    $('error').textContent = e.message;
+  }
+}
+
+$('file').addEventListener('change', e => e.target.files[0] && inspect(e.target.files[0]));
+const drop = $('drop');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', e => {
+  e.preventDefault(); drop.classList.remove('over');
+  if (e.dataTransfer.files[0]) inspect(e.dataTransfer.files[0]);
+});
+
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('error').textContent = '';
+  $('result').hidden = true;
+  $('convert').disabled = true;
+  $('status').textContent = '轉換中，可能需要一分鐘…';
+  const data = new FormData();
+  data.append('file', file);
+  data.append('name', $('name').value);
+  try {
+    const j = await api('/api/convert', data);
+    $('pdfs').replaceChildren(...j.pdfs.map(url => {
+      const li = document.createElement('li'), a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.textContent = decodeURIComponent(url.split('/').pop());
+      li.append(a); return li;
+    }));
+    list($('convert-warnings'), j.warnings);
+    $('result').hidden = false;
+    $('status').textContent = '轉換完成';
+  } catch (e) {
+    $('status').textContent = '';
+    $('error').textContent = e.message;
+  } finally {
+    $('convert').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

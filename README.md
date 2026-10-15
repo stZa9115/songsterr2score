@@ -2,7 +2,7 @@
 
 把瀏覽器另存的 Songsterr 譜頁 (.html) 轉成五線譜 / TAB 的 PDF 與 MusicXML。
 
-目前是命令列工具；Web 介面與六弦和弦支援開發中，見 [docs/BACKLOG.md](docs/BACKLOG.md)。
+網頁介面：`uv run python -m songsterr2score.server`（Windows 可雙擊 `start.bat`），會開啟 http://127.0.0.1:8000/ 。六弦和弦支援開發中，見 [docs/BACKLOG.md](docs/BACKLOG.md)。
 
 ## 需求
 

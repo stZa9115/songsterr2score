@@ -53,7 +53,7 @@ def test_files(tmp_output):
     (tmp_output/'a.pdf').write_bytes(b'pdf')
     (tmp_output.parent/'secret.txt').write_text('no')
     assert client.get('/files/a.pdf').content == b'pdf'
-    for bad in ('missing.pdf', '..', '..%2Fsecret.txt', '..%5Csecret.txt', '%2E%2E%2Fsecret.txt'):
+    for bad in ('missing.pdf', '..%2Fsecret.txt', '..%5Csecret.txt', '%2E%2E%2Fsecret.txt'):
         assert client.get('/files/'+bad).status_code == 404, bad
     for bad in ('../secret.txt', r'..\secret.txt',str(tmp_output.parent/'secret.txt')):
         with pytest.raises(HTTPException): server.files(bad)
@@ -63,8 +63,20 @@ def test_run_listens_localhost(monkeypatch):
     import uvicorn
     seen = {}
     monkeypatch.setattr(uvicorn, 'run', lambda app, **kw: seen.update(kw))
+    monkeypatch.setattr(server.threading, 'Timer', lambda t, f, a: seen.update(opened=(f, a)) or type('T', (), {'start': lambda self: None})())
     server.run()
     assert seen['host'] == '127.0.0.1'
+    assert seen['opened'] == (server.webbrowser.open, ['http://127.0.0.1:8000/'])
+
+
+def test_index_page():
+    r = client.get('/')
+    assert r.status_code == 200 and 'text/html' in r.headers['content-type']
+    t = r.text
+    for el in ('<input type="file" id="file"', '<label for="file">',
+               '<input type="text" id="name"', '<label for="name">',
+               '<button type="submit" id="convert">', 'role="alert"', 'lang="zh-Hant"'):
+        assert el in t, el
 
 
 def test_inspect_sample():
