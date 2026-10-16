@@ -1,10 +1,11 @@
 """本機 Web 後端：上傳 Songsterr 另存的 .html，檢視資訊並轉成 PDF。只聽 127.0.0.1。"""
-import pathlib, tempfile, urllib.parse
+import pathlib, tempfile, threading, urllib.parse, webbrowser
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from . import core
 
-OUTPUT = pathlib.Path(__file__).resolve().parent.parent/'output'
+HERE = pathlib.Path(__file__).resolve().parent
+OUTPUT = HERE.parent/'output'
 MAX_BYTES = 20*1024*1024
 
 app = FastAPI(title='songsterr2score')
@@ -18,6 +19,10 @@ def read_upload(file):
     if len(data) > MAX_BYTES:
         raise HTTPException(413, '檔案超過 20 MB 上限')
     return data.decode('utf-8', errors='replace')
+
+@app.get('/')
+def index():
+    return FileResponse(HERE/'static'/'index.html')
 
 @app.post('/api/inspect')
 def inspect(file: UploadFile | None = File(None)):
@@ -54,9 +59,12 @@ def files(name: str):
         raise HTTPException(404, '找不到檔案')
     return FileResponse(p)
 
-def run():
+def run(port=8000):
     import uvicorn
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    url = 'http://127.0.0.1:%d/' % port
+    print('開啟', url, '（關閉此視窗即停止伺服器）')
+    threading.Timer(1, webbrowser.open, [url]).start()
+    uvicorn.run(app, host='127.0.0.1', port=port)
 
 if __name__ == '__main__':
     run()
