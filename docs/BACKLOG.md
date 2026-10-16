@@ -62,7 +62,7 @@
 - bass 樣本的 golden 不變。
 - 產生吉他樣本的 golden，並在 PR 說明請使用者對照原譜檢查 PDF 的哪些小節。
 
-## 5. [ ] README 安裝與使用說明
+## 5. [x] README 安裝與使用說明
 
 驗收：
 - 涵蓋：安裝 uv 與 LilyPond（Windows / macOS / Linux）、如何從 Songsterr 另存完整頁面、啟動方式、輸出位置、已知限制。
