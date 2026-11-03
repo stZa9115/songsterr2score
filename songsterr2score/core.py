@@ -15,8 +15,8 @@ from svgpathtools import parse_path
 
 NAMES = ['c','cis','d','dis','e','f','fis','g','gis','a','ais','b']
 XSTEP = [('C',0),('C',1),('D',0),('D',1),('E',0),('F',0),('F',1),('G',0),('G',1),('A',0),('A',1),('B',0)]
-DUR_LY = {1:'16',2:'8',3:'8.',4:'4',6:'4.',8:'2',12:'2.',16:'1'}
-DUR_XML = {1:('16th',0),2:('eighth',0),3:('eighth',1),4:('quarter',0),6:('quarter',1),8:('half',0),12:('half',1),16:('whole',0)}
+DUR_LY = {1:'16',2:'8',3:'8.',4:'4',6:'4.',7:'4..',8:'2',12:'2.',14:'2..',16:'1'}
+DUR_XML = {1:('16th',0),2:('eighth',0),3:('eighth',1),4:('quarter',0),6:('quarter',1),7:('quarter',2),8:('half',0),12:('half',1),14:('half',2),16:('whole',0)}
 
 class SongsterrError(Exception):
     """無法轉換：不是 Songsterr 譜頁、找不到譜面、譜名為空等。訊息為繁中。"""
@@ -80,8 +80,11 @@ def classify(g):
     if abs(w-8) < 1.5 and abs(h-24) < 3: return 'qrest'
     if abs(w-12) < 1.5 and abs(h-6) < 1.5: return 'wrest'      # 半/全休止符
     if abs(w-9) < 1.5 and abs(h-15) < 3: return 'erest'
+    if abs(w-11) < 1.5 and abs(h-22) < 2: return 'srest'
+    if abs(w-3) < .6 and abs(h-13) < 1: return 'paren'         # 連結音外的括號，一個括號由數段組成
     if abs(h-10) < .8:
         if nh == 0:
+            if abs(w-9) < 1 and n == 12: return 'x'             # 悶音
             if w < 5: return '1'
             return {16:'3', 14:'5', 15:'5', 11:'2', 8:'7'}.get(n, '?')
         if nh == 2: return '8'
@@ -124,21 +127,39 @@ def parse_html(html, warn):
             sigs.append((owner[-1] if owner else (nums[0] if nums else 1), int(a), int(b)))
         t = re.search(r'ai7mjG_tempoText">=\s*(\d+)', L)
         if t and tempo is None: tempo = int(t.group(1))
-        stems = [float(v) for v in re.findall(r'M([\d.]+),50v18', L)]
-        beams = [(int(float(y)), float(x), float(x)+float(w)) for x, y, w in re.findall(r'M([\d.]+),(\d+)v2h([\d.]+)v-2z', L)]
+        sy = 50+12*(ns-4)    # 符桿頂端：四弦 50，每多一弦下移 12
+        stems = {float(x): 4 for x in re.findall(r'M([\d.]+),%dv18' % sy, L)}
+        stems.update({float(x): 8 for x in re.findall(r'M([\d.]+),%dv9' % (sy+9), L)})   # 短符桿 = 二分音符
+        beams = [(int(float(y))-sy, min(float(x), float(x)+float(w)), max(float(x), float(x)+float(w)))   # 寬度為負 = 向左的短符槓
+                 for x, y, w in re.findall(r'M([\d.]+),(\d+)v2h(-?[\d.]+)v-2z', L)]
+        sdots = [a for _, a, b in beams if b-a < 3]            # 符桿右側 2x2 小方塊 = 附點
+        beams = [bm for bm in beams if bm[2]-bm[1] >= 3]
+        brackets = [float(x) for x in re.findall(r'M ([\d.]+) \d+ L \1 \d+', L)]   # 三連音括號的左右兩端
+        brackets = list(zip(brackets[::2], brackets[1::2]))
+        for d in re.findall(r'<path d="([^"]*)"[^>]*class="tNr0-q_tuplet"', L):
+            if any(g['n'] != 16 for g in glyphs_of(d)): warn('有三連音以外的連音，時值可能錯誤')
+        def stem_base(sx):
+            if stems[sx] == 8: return 8
+            return {0:4, 1:2, 2:1}[sum(1 for y in (16, 11) if any(yy == y and a-.1 <= sx <= b+.1 for yy, a, b in beams))]
         for d, mn in re.findall(r'<path d="([^"]*)"[^>]*data-notes-measure="(\d+)"', L):
-            mn = int(mn); evs = []; cur = None; dots = []
+            mn = int(mn); notes = []; evs = []; dots = []
             for g in glyphs_of(d):
                 c = classify(g)
                 if c == '?':
                     warn('第 %d 小節有無法辨識的符號 (%.0fx%.0f)，已略過' % (mn, g['w'], g['h'])); continue
-                if c.isdigit():
-                    if cur and abs((g['y0']+g['y1'])-(cur['y0']+cur['y1'])) < 1 and g['x0']-cur['x1'] < 3:
-                        cur['txt'] += c; cur['x1'] = g['x1']
-                    else:
-                        cur = dict(kind='note', txt=c, x0=g['x0'], x1=g['x1'], y0=g['y0'], y1=g['y1'], dots=0); evs.append(cur)
+                if c.isdigit() or c == 'x':
+                    cy = g['y0']+g['y1']
+                    cur = next((n for n in notes if abs(cy-(n['y0']+n['y1'])) < 1 and 0 <= g['x0']-n['x1'] < 5 and c != 'x' != n['txt']), None)
+                    if cur: cur['txt'] += c; cur['x1'] = g['x1']
+                    else: notes.append(dict(txt=c, x0=g['x0'], x1=g['x1'], y0=g['y0'], y1=g['y1']))
                 elif c == 'dot': dots.append(g)
-                else: evs.append(dict(kind=c, x0=g['x0'], x1=g['x1'], dots=0))
+                elif c != 'paren': evs.append(dict(kind=c, x0=g['x0'], x1=g['x1'], dots=0))
+            for n in sorted(notes, key=lambda n: n['x0']):   # 中心對齊的音合成同一個和弦
+                cx = (n['x0']+n['x1'])/2
+                ch = next((e for e in evs if e['kind'] == 'note' and abs(cx-(e['x0']+e['x1'])/2) < 4), None)
+                if ch: ch['notes'].append(n); ch['x0'] = min(ch['x0'], n['x0']); ch['x1'] = max(ch['x1'], n['x1'])
+                else: evs.append(dict(kind='note', notes=[n], x0=n['x0'], x1=n['x1'], dots=0))
+            evs.sort(key=lambda e: e['x0'])
             for dt in dots:
                 best = None
                 for e in evs:
@@ -149,12 +170,21 @@ def parse_html(html, warn):
                 if e['kind'] == 'note':
                     s = [v for v in stems if e['x0']-1 <= v <= e['x1']+1]
                     e['stem'] = s[0] if s else None
-                    if s:
-                        lv = sum(1 for y in (66, 61) if any(yy == y and a-.1 <= s[0] <= b+.1 for yy, a, b in beams))
-                        e['base'] = {0:4, 1:2, 2:1}[lv]
-                    else: e['base'] = None
-                else: e['base'] = {'qrest':4, 'erest':2, 'wrest':None}[e['kind']]
+                    e['base'] = stem_base(s[0]) if s else None
+                    if s: e['dots'] += sum(1 for a in sdots if abs(a-s[0]-4) < .6)
+                else: e['base'] = {'qrest':4, 'erest':2, 'srest':1, 'wrest':None}[e['kind']]
             meas[mn] = evs
+        for i, (x, mn) in enumerate(markers):   # 只有符桿、沒有格數 = 延續前一個音的連結音
+            end = markers[i+1][0] if i+1 < len(markers) else float('inf')
+            used = {e.get('stem') for e in meas.get(mn, [])}
+            for sx in stems:
+                if x-4 <= sx < end-4 and sx not in used:
+                    meas.setdefault(mn, []).append(dict(kind='tie', x0=sx, x1=sx, stem=sx, base=stem_base(sx),
+                                                        dots=sum(1 for a in sdots if abs(a-sx-4) < .6)))
+            for e in meas.get(mn, []):
+                c = e['stem'] if e.get('stem') is not None else (e['x0']+e['x1'])/2
+                br = next((ab for ab in brackets if ab[0]-1 <= c <= ab[1]+1 and x-4 <= ab[0] < end-4), None)
+                if br: e['tup'] = (mn, br[0])
     return dict(title=title, tuning=tuning, meas=meas, allm=sorted(set(allm) | set(meas)), sigs=sigs, tempo=tempo or 120, ns=ns)
 
 # ---------------------------------------------------------------- 節奏
@@ -164,18 +194,23 @@ def measure_units(sigs, mn):
         if m <= mn: a, b = x, y
     return a*16//b, (a, b)
 
+def length(evs):
+    """實際長度 (十六分音符)；三連音內的音只算 2/3"""
+    return sum(e['u'] for e in evs if 'tup' not in e) + sum(e['u'] for e in evs if 'tup' in e)*2/3
+
 def finalize(song, warn):
     """每個事件補上 units / string / fret / midi"""
     tun = song['tuning']
+    prev = None    # 前一個音 (連結音用)
     for mn in song['allm']:
         total, _ = measure_units(song['sigs'], mn)
         evs = sorted(song['meas'].get(mn, []), key=lambda e: e['x0'])
         song['meas'][mn] = evs
         for e in evs:
-            if e['base'] is not None: e['u'] = e['base']*3//2 if e['dots'] else e['base']
+            if e['base'] is not None: e['u'] = e['base']*2 - e['base']//2**e['dots']   # 附點 x1.5、雙附點 x1.75
         unk = [e for e in evs if e['base'] is None]
-        known = sum(e['u'] for e in evs if e['base'] is not None)
-        rem = total-known
+        known = length([e for e in evs if e['base'] is not None])
+        rem = round(total-known)
         if unk:
             if len(unk) == 1: unk[0]['u'] = rem
             else:
@@ -185,13 +220,20 @@ def finalize(song, warn):
                 if e['u'] not in DUR_LY:
                     warn('第 %d 小節時值 %d/16 無法表示，改用最接近值' % (mn, e['u']))
                     e['u'] = min(DUR_LY, key=lambda k: abs(k-e['u']))
-        if evs and sum(e['u'] for e in evs) != total:
-            warn('第 %d 小節拍數不符 (%d/%d 個十六分音符)，請對照原譜' % (mn, sum(e['u'] for e in evs), total))
+        if evs and length(evs) != total:
+            warn('第 %d 小節拍數不符 (%g/%d 個十六分音符)，請對照原譜' % (mn, length(evs), total))
         if not evs: song['meas'][mn] = [dict(kind='wrest', u=total, x0=0, dots=0)]
         for e in song['meas'][mn]:
-            if e['kind'] == 'note':
-                si = min(range(song['ns']), key=lambda i: abs((e['y0']+e['y1'])/2-(0.5+12*i)))
-                e['string'] = si; e['fret'] = int(e['txt']); e['midi'] = tun[si]+e['fret']
+            if e['kind'] == 'tie':
+                if prev: e.update(kind='note', notes=[dict(n) for n in prev['notes']], tied=True); prev['tie'] = True
+                else: e['kind'] = 'qrest'; warn('第 %d 小節的連結音找不到前一個音，改為休止符' % mn)
+            if e['kind'] != 'note': continue
+            prev = e
+            if e.get('tied'): continue
+            for n in e['notes']:
+                si = min(range(song['ns']), key=lambda i: abs((n['y0']+n['y1'])/2-(0.5+12*i)))
+                n['string'] = si; n['fret'] = None if n['txt'] == 'x' else int(n['txt']); n['midi'] = tun[si]+(n['fret'] or 0)
+            e['notes'].sort(key=lambda n: n['midi'])
     return song
 
 # ---------------------------------------------------------------- LilyPond
@@ -203,18 +245,34 @@ def ly_measure(song, mn):
     out = []
     for e in song['meas'][mn]:
         d = DUR_LY[e['u']]
-        if e['kind'] == 'note': out.append('%s%s\\%d' % (ly_pitch(e['midi']), d, e['string']+1))
+        if e['kind'] == 'note':
+            ns = e['notes']
+            dead = lambda n: '\\deadNote ' if n['fret'] is None else ''
+            tie = '~' if e.get('tie') else ''
+            if len(ns) == 1: out.append('%s%s%s\\%d%s' % (dead(ns[0]), ly_pitch(ns[0]['midi']), d, ns[0]['string']+1, tie))
+            else: out.append('<%s>%s%s' % (' '.join('%s%s\\%d' % (dead(n), ly_pitch(n['midi']), n['string']+1) for n in ns), d, tie))
         elif e['u'] == measure_units(song['sigs'], mn)[0]: out.append('R%s' % d)
         else: out.append('r%s' % d)
-    return ' '.join(out)
+        out[-1] = (e, out[-1])
+    s, cur = [], None
+    for e, t in out:   # 同一組三連音包進 \tuplet
+        if e.get('tup') != cur:
+            if cur: s.append('}')
+            if e.get('tup'): s.append('\\tuplet 3/2 {')
+            cur = e.get('tup')
+        s.append(t)
+    return ' '.join(s + (['}'] if cur else []))
 
 def build_ly(song, first, last, mode, per_line=4):
     bass = song['ns'] <= 5
-    body = []; lastsig = None
+    body = []; lastsig = None; curlen = None
     for mn in range(first, last+1):
         if mn not in song['meas']: continue
-        sg = measure_units(song['sigs'], mn)[1]
-        if sg != lastsig: body.append('\\time %d/%d' % sg); lastsig = sg
+        total, sg = measure_units(song['sigs'], mn)
+        if sg != lastsig: body.append('\\time %d/%d' % sg); lastsig = sg; curlen = total
+        ln = length(song['meas'][mn])
+        want = ln if ln != total and ln == int(ln) else total   # 拍數不符的小節照實際長度，後面的小節線才不會錯位
+        if want != curlen: body.append('\\set Timing.measureLength = #(ly:make-moment %d/16)' % want); curlen = want
         body.append(ly_measure(song, mn)+' | %% %d' % mn)
         if (mn-first+1) % per_line == 0 and mn != last: body.append('\\break')
     tun = ' '.join(ly_pitch(m) for m in reversed(song['tuning']))
@@ -240,6 +298,7 @@ def build_xml(song, first, last):
          '<score-partwise version="3.1"><work><work-title>%s</work-title></work>' % song['title'].replace('&','&amp;').replace('<','&lt;'),
          '<part-list><score-part id="P1"><part-name>%s</part-name></score-part></part-list><part id="P1">' % ('Bass' if bass else 'Guitar')]
     lastsig = None
+    k = 3 if any('tup' in e for m in song['meas'].values() for e in m) else 1   # 有三連音時 divisions 改為 12
     for mn in range(first, last+1):
         if mn not in song['meas']: continue
         total, sg = measure_units(song['sigs'], mn)
@@ -247,11 +306,12 @@ def build_xml(song, first, last):
         if mn == first or sg != lastsig:
             attr = '<attributes>'
             if mn == first:
-                attr += '<divisions>4</divisions><key><fifths>0</fifths></key>'
+                attr += '<divisions>%d</divisions>' % (4*k) + '<key><fifths>0</fifths></key>'
             attr += '<time><beats>%d</beats><beat-type>%d</beat-type></time>' % sg
             if mn == first:
                 attr += '<staves>2</staves>'
-                attr += '<clef number="1"><sign>F</sign><line>4</line></clef><clef number="2"><sign>TAB</sign><line>5</line></clef>'
+                attr += '<clef number="1"><sign>F</sign><line>4</line></clef>' if bass else '<clef number="1"><sign>G</sign><line>2</line><clef-octave-change>-1</clef-octave-change></clef>'
+                attr += '<clef number="2"><sign>TAB</sign><line>5</line></clef>'
                 attr += '<staff-details number="2"><staff-lines>%d</staff-lines>' % ns
                 for i, m in enumerate(reversed(song['tuning'])):
                     st, al = XSTEP[m % 12]
@@ -266,19 +326,24 @@ def build_xml(song, first, last):
         for staff in (1, 2):
             for e in song['meas'][mn]:
                 typ, dots = DUR_XML[e['u']]
-                x = '<note>'
-                if e['kind'] == 'note':
-                    m = e['midi']+(12 if (bass and staff == 1) else 0)
-                    st, al = XSTEP[m % 12]
-                    x += '<pitch><step>%s</step>%s<octave>%d</octave></pitch>' % (st, '<alter>1</alter>' if al else '', m//12-1)
-                else:
-                    x += '<rest measure="yes"/>' if e['u'] == total else '<rest/>'
-                x += '<duration>%d</duration><voice>%d</voice><type>%s</type>' % (e['u'], staff, typ)
-                x += '<dot/>'*dots + '<staff>%d</staff>' % staff
-                if e['kind'] == 'note':
-                    x += '<notations><technical><string>%d</string><fret>%d</fret></technical></notations>' % (ns-e['string'], e['fret'])
-                o.append(x+'</note>')
-            if staff == 1: o.append('<backup><duration>%d</duration></backup>' % total)
+                for i, n in enumerate(e['notes'] if e['kind'] == 'note' else [None]):
+                    x = '<note>' + ('<chord/>' if i else '')
+                    if n:
+                        m = n['midi']+(12 if (bass and staff == 1) else 0)
+                        st, al = XSTEP[m % 12]
+                        x += '<pitch><step>%s</step>%s<octave>%d</octave></pitch>' % (st, '<alter>1</alter>' if al else '', m//12-1)
+                    else:
+                        x += '<rest measure="yes"/>' if e['u'] == total else '<rest/>'
+                    ties = (['stop'] if e.get('tied') else []) + (['start'] if e.get('tie') else [])
+                    x += '<duration>%d</duration>' % (e['u']*k*2//3 if 'tup' in e else e['u']*k) + ''.join('<tie type="%s"/>' % t for t in ties)
+                    x += '<voice>%d</voice><type>%s</type>' % (staff, typ)
+                    x += '<dot/>'*dots + ('<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' if 'tup' in e else '')
+                    x += ('<notehead>x</notehead>' if n and n['fret'] is None else '') + '<staff>%d</staff>' % staff
+                    if n:
+                        x += '<notations>%s<technical><string>%d</string><fret>%d</fret></technical></notations>' % (
+                            ''.join('<tied type="%s"/>' % t for t in ties), n['string']+1, n['fret'] or 0)   # MusicXML 弦 1 = 最高音弦
+                    o.append(x+'</note>')
+            if staff == 1: o.append('<backup><duration>%d</duration></backup>' % round(length(song['meas'][mn])*k))
         o.append('</measure>')
     o.append('</part></score-partwise>')
     return '\n'.join(o)

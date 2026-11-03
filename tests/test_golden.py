@@ -95,3 +95,9 @@ def test_cli_name_and_default(tmp_path, monkeypatch):
     core.main()
     ly = tmp_path/'b'/'【MV】プロポーズ - 9Lana_both.ly'
     assert 'title = "【MV】プロポーズ - 9Lana"' in ly.read_text(encoding='utf-8')
+
+
+@pytest.mark.parametrize('sample', SAMPLES, ids=lambda p: p.stem)
+def test_no_rhythm_guess_warnings(sample):
+    for w in load(sample)[3]:
+        assert not any(k in w for k in ('無符桿', '無法表示', '無法辨識')), w
