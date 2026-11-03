@@ -122,7 +122,27 @@
 - 單元測試用合成的輪廓涵蓋「15 段的 3」與「正常的 5」，不可直接複製樣本中的路徑資料。
 - 依 Golden 規則更新なつのうた（與プロポーズ，若有變動）的 golden，並在 PR 說明每個差異都屬於這個修正。
 
+## 10. [ ] P.M.（Palm Mute，悶音奏法）記號
+
+使用者要求，參考 OUTSIDER RODEO 第 62–65 小節。
+
+頁面上的畫法（已確認）：每段 P.M. 在譜行 SVG 內是一個 `<g data-effect-run="palmMute-…">` 群組，含
+`<text class="…_text">P. M.</text>`、一條虛線 `<line x1 … x2 …>`（範圍即涵蓋的音），以及結束處的一條短豎線。
+跨行的一段 P.M. 會拆成每行各一個群組：沒有結束短豎線的群組表示延續到下一行。
+`palmMute-0-N` 中的 N 看起來是該群組起點所在小節的 0 起算編號，但應以 x 座標對應音符為準。
+OUTSIDER RODEO 共 3 個群組，構成 2 段：第 62–65 小節（跨兩行）、第 121–122 小節。
+
+驗收：
+- 解析出每段 P.M. 涵蓋的音符（依虛線的 x 範圍對應同一行的音符，跨行要接續）。
+- LilyPond 的五線譜與 TAB 都在涵蓋範圍上方顯示「P.M.」加虛線延伸線，到範圍結束為止（例如 TextSpanner）。
+- MusicXML 以 MuseScore 能顯示的方式輸出 P.M. 與其範圍（例如 `<direction>` 的 `<words>P.M.</words>` 搭配 `<dashes>` start / stop），並在 PR 說明選擇的理由。
+- 單元測試以合成 HTML 涵蓋：單行一段、跨行一段、同一行有兩段。
+- OUTSIDER RODEO 三種 .ly 能通過 LilyPond 編譯；PR 說明請使用者對照原譜檢查第 62–65、121–122 小節。
+- 依 Golden 規則更新 OUTSIDER RODEO 的 golden，其他樣本不得變動。
+
 ## 之後再考慮
+
+- 其他 `data-effect-run` 記號：Fear Of The Dark 有 accent（26 處）、staccato（29 處），目前都沒有輸出。
 
 - 六弦解析的字形規則（括號、悶音、十六分休止符）目前只有樣本測試涵蓋，可補合成 HTML 的單元測試；
   沒有格數的符桿一律視為連結音，格數偏移太多時可能誤判（PR #9 審查提出）。
