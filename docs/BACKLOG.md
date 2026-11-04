@@ -162,12 +162,55 @@ Fear Of The Dark 的分布（小節編號為 1 起算）：
 - Fear Of The Dark 三種 .ly 能通過 LilyPond 編譯；在 PR 說明列出輸出中每個記號所在的小節，數量與上列相符（26 / 29），請使用者對照原譜抽查。
 - Fear Of The Dark 目前沒有 golden，不需產生；其他樣本的 golden 不得變動。
 
+## 12. [ ] 合成測試樣本與 GitHub Actions
+
+問題：golden 測試只能用本機的 Songsterr 頁面（版權，不能提交），別人 clone 後或 CI 上只會全部跳過，
+等於沒有端到端的回歸測試。
+
+驗收：
+- 新增提交進 repo 的手工合成樣本（建議放 `tests/fixtures/`），至少三份：四弦單音、六弦單音、六弦和弦。
+  合計涵蓋：附點、連結音、三連音、休止符、悶音（x）、跨行，以及第 9–11 項處理的字形與記號（P.M.、重音、斷奏）。
+- 合成樣本必須由程式或手寫產生，**不可複製真實頁面的任何片段**（包括數字字形的路徑資料）；
+  產生方式寫在 fixtures 目錄的 README 或產生腳本內，修改時可重新產生。
+- 數字字形要能被 `classify()` 正確辨識成 0–9 每一個數字（不再只有測試裡的矩形 '1'）。
+- 合成樣本的完整 golden（.ly / .musicxml / 警告）可以提交；golden 測試同時涵蓋 `tests/fixtures/` 與 `samples/`，
+  `UPDATE_GOLDEN` 的用法不變。
+- 新增 `.github/workflows/test.yml`：push 與 PR 時在 ubuntu-latest 執行 `uv sync` 與 `uv run pytest -q`，
+  並安裝 LilyPond（`apt install lilypond`，確認版本為 2.24 以上），讓編譯測試真的執行而不是跳過。
+- 在 PR 說明附上 Actions 執行成功的連結，並列出 CI 上跳過的測試（應只剩依賴 `samples/` 的那些）。
+- README「開發」段落說明 CI 與合成樣本。
+
+## 13. [ ] 網頁 UI 選擇小節範圍
+
+命令列已有 `--bars`，網頁沒有。
+
+驗收：
+- 上傳解析後顯示「起始小節」「結束小節」兩個數字欄位，預填 `/api/inspect` 回傳的完整範圍，有 label、可用鍵盤操作。
+- `/api/convert` 接受可選的起訖小節；未提供時轉換全部（與現在相同）。
+- 起訖超出範圍、起始大於結束、非整數時回傳 4xx 與繁中訊息，UI 顯示該訊息。
+- 指定範圍時輸出檔名不變（仍是 `{譜名}_*.pdf`），PDF 第一個小節編號為起始小節。
+- `TestClient` 測試：錯誤情況不需樣本；成功情況用合成樣本（第 12 項完成前用 `samples/`，沒有時跳過）。
+- 更新 SPEC「流程」與 README。
+
+## 14. [ ] MIDI 輸出
+
+用途：聽轉換結果，快速發現節奏或格數錯誤。
+
+驗收：
+- 另外輸出 `{譜名}.mid`，由 LilyPond 的 `\midi` 區塊產生；速度沿用現有從頁面讀取的 tempo。
+  不可改變三份 PDF 的版面（`\midi` 放在獨立的 `\score` 或只加在其中一個 .ly，並在 PR 說明選擇）。
+- 樂器：bass 用 electric bass，吉他用 electric guitar（MIDI program 名稱）；悶音（x）不發聲或以短音呈現，PR 說明選擇。
+- 網頁結果區多一個 MIDI 下載連結；找不到 LilyPond 時與 PDF 一樣不產生。
+- 測試：有 LilyPond 時樣本能產生非空的 .mid，且檔頭為 `MThd`。
+- 依 Golden 規則更新受影響的 golden，並在 PR 說明。
+- 更新 SPEC「輸出」表格與 README。
+
 ## 之後再考慮
 
 - 六弦解析的字形規則（括號、悶音、十六分休止符）目前只有樣本測試涵蓋，可補合成 HTML 的單元測試；
   沒有格數的符桿一律視為連結音，格數偏移太多時可能誤判（PR #9 審查提出）。
 
-- 手工合成的最小 HTML 樣本提交進 repo，讓沒有真實樣本的人與 CI 也能跑 golden 測試。
-- GitHub Actions。
-- 技巧記號（推弦、滑音、悶音、連結線）。
-- 小節範圍選擇、批次上傳。
+- 技巧記號（推弦、滑音、搥勾弦、顫音）。連結線與悶音（x）已支援。
+- 批次上傳。
+- 警告依小節分組顯示，方便對照原譜。
+- 偵測 Songsterr 改版：預期的 SVG 結構找不到時，明確提示可能改版，而不是產生大量警告。
